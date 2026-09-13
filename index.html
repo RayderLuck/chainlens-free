@@ -18,24 +18,47 @@
   <div id="result" class="mt-6 p-4 bg-zinc-900 rounded hidden"></div>
 
   <script type="module">
-    import { getWhaleTransactions } from "./src/core/whales.js";
+    // Pega sua key da Cloudflare - já configuramos lá
+    const KEY = import.meta.env.VITE_NODEREAL_KEY;
+    const RPC = `https://bsc-mainnet.nodereal.io/v1/${KEY}`;
+
+    async function rpc(method, params){
+      const r = await fetch(RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+      });
+      const j = await r.json();
+      if(j.error) throw new Error(j.error.message);
+      return j.result;
+    }
+
+    async function getWhaleTransactions(address){
+      if(!KEY) throw new Error('KEY não encontrada - verifica Variáveis na Cloudflare');
+      const balanceHex = await rpc('eth_getBalance', [address, 'latest']);
+      const balanceBNB = parseInt(balanceHex, 16) / 1e18;
+      return { address, balanceBNB, isWhale: balanceBNB >= 100 };
+    }
+
     window.check = async () => {
-      const addr = document.getElementById('addr').value;
+      const addr = document.getElementById('addr').value.trim();
       const resultDiv = document.getElementById('result');
       if(!addr) return alert('Cola uma carteira');
       resultDiv.classList.remove('hidden');
       resultDiv.innerHTML = '🔍 Consultando NodeReal...';
       try {
-        const data = await getWhaleTransactions(addr, 10);
+        const data = await getWhaleTransactions(addr);
         resultDiv.innerHTML = `
-          <div>Carteira: ${data.address}</div>
-          <div>Saldo: ${data.balanceBNB.toFixed(4)} BNB</div>
-          <div class="mt-2 ${data.isWhale ? 'text-green-400' : 'text-yellow-400'}">
-            ${data.isWhale ? '🐋 BALEIA DETECTADA' : '🐟 Peixe pequeno'}
+          <div class="text-sm text-zinc-400">Carteira:</div>
+          <div class="font-mono text-sm break-all">${data.address}</div>
+          <div class="mt-3">Saldo: <b>${data.balanceBNB.toFixed(4)} BNB</b></div>
+          <div class="mt-3 p-3 rounded ${data.isWhale ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">
+            ${data.isWhale ? '🐋 BALEIA DETECTADA (100+ BNB)' : '🐟 Peixe pequeno'}
           </div>
+          <div class="mt-2 text-xs text-zinc-500">NodeReal: ${KEY ? 'Conectado ✅' : 'Sem KEY ❌'}</div>
         `;
       } catch(e) {
-        resultDiv.innerHTML = 'Erro: ' + e.message + '<br>Verifica sua NODEREAL_KEY';
+        resultDiv.innerHTML = '<span class="text-red-400">Erro: ' + e.message + '</span>';
       }
     }
   </script>
