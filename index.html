@@ -11,14 +11,13 @@
   <p class="text-gray-400">BNB Chain tracker powered by NodeReal free tier</p>
 
   <div class="mt-6 flex gap-2">
-    <input id="addr" placeholder="0x... carteira BNB" class="flex-1 p-3 rounded bg-zinc-900 border border-zinc-800">
+    <input id="addr" placeholder="0x... carteira BNB" class="flex-1 p-3 rounded bg-zinc-900 border border-zinc-800" value="0x0000000000000000000000000000000000001004">
     <button onclick="check()" class="px-6 py-3 bg-white text-black rounded font-bold">Rastrear</button>
   </div>
 
   <div id="result" class="mt-6 p-4 bg-zinc-900 rounded hidden"></div>
 
   <script type="module">
-    // Pega sua key da Cloudflare - já configuramos lá
     const KEY = import.meta.env.VITE_NODEREAL_KEY;
     const RPC = `https://bsc-mainnet.nodereal.io/v1/${KEY}`;
 
@@ -33,13 +32,6 @@
       return j.result;
     }
 
-    async function getWhaleTransactions(address){
-      if(!KEY) throw new Error('KEY não encontrada - verifica Variáveis na Cloudflare');
-      const balanceHex = await rpc('eth_getBalance', [address, 'latest']);
-      const balanceBNB = parseInt(balanceHex, 16) / 1e18;
-      return { address, balanceBNB, isWhale: balanceBNB >= 100 };
-    }
-
     window.check = async () => {
       const addr = document.getElementById('addr').value.trim();
       const resultDiv = document.getElementById('result');
@@ -47,18 +39,22 @@
       resultDiv.classList.remove('hidden');
       resultDiv.innerHTML = '🔍 Consultando NodeReal...';
       try {
-        const data = await getWhaleTransactions(addr);
+        if(!KEY) throw new Error('VITE_NODEREAL_KEY não encontrada. Coloca na Cloudflare em Variáveis de ambiente');
+        const balanceHex = await rpc('eth_getBalance', [addr, 'latest']);
+        const balanceBNB = parseInt(balanceHex, 16) / 1e18;
+        const isWhale = balanceBNB >= 100;
+        
         resultDiv.innerHTML = `
-          <div class="text-sm text-zinc-400">Carteira:</div>
-          <div class="font-mono text-sm break-all">${data.address}</div>
-          <div class="mt-3">Saldo: <b>${data.balanceBNB.toFixed(4)} BNB</b></div>
-          <div class="mt-3 p-3 rounded ${data.isWhale ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">
-            ${data.isWhale ? '🐋 BALEIA DETECTADA (100+ BNB)' : '🐟 Peixe pequeno'}
+          <div class="text-xs text-zinc-500">Carteira</div>
+          <div class="font-mono text-xs break-all">${addr}</div>
+          <div class="mt-3 text-lg">Saldo: <b>${balanceBNB.toFixed(4)} BNB</b></div>
+          <div class="mt-3 p-3 rounded font-bold ${isWhale ? 'bg-green-900/50 text-green-400 border border-green-800' : 'bg-yellow-900/50 text-yellow-400 border border-yellow-800'}">
+            ${isWhale ? '🐋 BALEIA DETECTADA (100+ BNB)' : '🐟 Peixe pequeno'}
           </div>
-          <div class="mt-2 text-xs text-zinc-500">NodeReal: ${KEY ? 'Conectado ✅' : 'Sem KEY ❌'}</div>
+          <div class="mt-3 text-xs text-zinc-500">NodeReal: Conectado ✅ | Key: ${KEY.substring(0,6)}...</div>
         `;
       } catch(e) {
-        resultDiv.innerHTML = '<span class="text-red-400">Erro: ' + e.message + '</span>';
+        resultDiv.innerHTML = '<div class="text-red-400">Erro: ' + e.message + '</div>';
       }
     }
   </script>
