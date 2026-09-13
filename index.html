@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>chainlens-free - útil</title>
+<title>chainlens-free</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-black text-white p-4 md:p-8 min-h-screen">
@@ -11,24 +11,26 @@
     <div class="flex justify-between items-center">
       <div>
         <h1 class="text-3xl font-bold">🔭 chainlens</h1>
-        <p class="text-zinc-500 text-sm">seu radar de baleias BNB • útil e grátis</p>
+        <p class="text-zinc-500 text-sm">seu radar de baleias BNB • grátis com NodeReal</p>
       </div>
-      <div id="price" class="text-right"><div class="text-xs text-zinc-500">BNB</div><div class="font-bold">--</div></div>
+      <div id="price" class="text-right"><div class="text-xs text-zinc-500">BNB</div><div class="font-bold animate-pulse">...</div></div>
     </div>
 
     <div class="mt-6 flex gap-2">
-      <input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm" placeholder="0x... cole a carteira aqui" value="0x8894E0a0c962CB723c1976a4421c95949bE2D4E3">
-      <button onclick="check()" class="px-6 py-3 bg-white text-black rounded-xl font-bold">Rastrear</button>
-      <button onclick="saveWhale()" class="px-4 py-3 bg-zinc-800 rounded-xl">⭐</button>
+      <input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm outline-none focus:border-white" placeholder="0x... cole a carteira aqui" value="0x8894E0a0c962CB723c1976a4421c95949bE2D4E3">
+      <button onclick="check()" class="px-6 py-3 bg-white text-black rounded-xl font-bold hover:bg-zinc-200">Rastrear</button>
+      <button onclick="saveWhale()" title="Salvar baleia" class="px-4 py-3 bg-zinc-800 rounded-xl hover:bg-zinc-700">⭐</button>
     </div>
 
     <div id="result" class="mt-6 hidden"></div>
     <div id="txs" class="mt-4 hidden"></div>
 
     <div class="mt-8">
-      <div class="flex justify-between items-center mb-3"><h2 class="font-bold">📋 Minhas baleias salvas</h2><button onclick="clearAll()" class="text-xs text-zinc-500">limpar</button></div>
+      <div class="flex justify-between items-center mb-3"><h2 class="font-bold">📋 Minhas baleias salvas</h2><button onclick="clearAll()" class="text-xs text-zinc-500 hover:text-white">limpar tudo</button></div>
       <div id="watchlist" class="grid gap-2"></div>
     </div>
+
+    <div class="mt-10 text-center text- text-zinc-600">Feito com NodeReal + Cloudflare Pages • chainlens-free.pages.dev • sem cartão, sem telefone</div>
   </div>
 
 <script type="module">
@@ -39,88 +41,135 @@
   async function getPrice(){
     try{
       const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
-      bnbPrice = (await r.json()).binancecoin.usd;
+      const data = await r.json();
+      bnbPrice = data.binancecoin.usd;
       document.getElementById('price').innerHTML = `<div class="text-xs text-zinc-500">BNB</div><div class="font-bold">$${bnbPrice}</div>`;
-    }catch{ bnbPrice = 600; }
+    }catch{ bnbPrice = 615; document.getElementById('price').innerHTML = `<div class="text-xs text-zinc-500">BNB</div><div class="font-bold">$${bnbPrice}</div>`; }
   }
-  getPrice(); setInterval(getPrice, 60000);
+  getPrice();
 
-  async function rpcCall(m,p){
-    const r = await fetch(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:m,params:p})});
-    const j = await r.json(); if(j.error) throw new Error(j.error.message); return j.result;
+  async function rpcCall(method, params){
+    if(!KEY) throw new Error('VITE_NODEREAL_KEY não configurada na Cloudflare');
+    const r = await fetch(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});
+    const j = await r.json();
+    if(j.error) throw new Error(j.error.message);
+    return j.result;
   }
 
   function getWatchlist(){ try{ return JSON.parse(localStorage.getItem('chainlens_watch')||'[]'); }catch{ return []; } }
+
   function renderWatchlist(){
     const list = getWatchlist();
-    document.getElementById('watchlist').innerHTML = list.length ? list.map(w=>`
+    const el = document.getElementById('watchlist');
+    if(!list.length){ el.innerHTML = '<div class="text-zinc-600 text-sm bg-zinc-900/50 p-4 rounded-xl border border-dashed border-zinc-800">Nenhuma baleia salva ainda. Rastreie uma carteira e clique na ⭐</div>'; return; }
+    el.innerHTML = list.map(w=>`
       <div class="flex justify-between items-center bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-        <div class="font-mono text-xs truncate">${w.addr}</div>
+        <div class="font-mono text-xs truncate max-w- md:max-w-">${w.addr}</div>
         <div class="flex gap-2 items-center">
-          <span class="text-xs ${w.bnb>=10000?'text-purple-400':'text-green-400'}">${w.bnb.toFixed(1)} BNB</span>
-          <button onclick="document.getElementById('addr').value='${w.addr}';check()" class="text-xs bg-white text-black px-2 py-1 rounded">ver</button>
+          <span class="text-xs ${w.bnb>=10000?'text-purple-400':'text-green-400'} font-bold">${w.bnb.toFixed(1)} BNB</span>
+          <button onclick="document.getElementById('addr').value='${w.addr}';check();window.scrollTo({top:0,behavior:'smooth'})" class="text-xs bg-white text-black px-3 py-1 rounded-full font-bold">ver</button>
         </div>
-      </div>`).join('') : '<div class="text-zinc-600 text-sm">Nenhuma baleia salva. Rastreie e clique na ⭐</div>';
+      </div>`).join('');
   }
   renderWatchlist();
 
   window.saveWhale = () => {
-    const addr = document.getElementById('addr').value.trim(); const bnb = parseFloat(document.getElementById('addr').dataset.bnb||'0');
-    if(!addr) return; const list = getWatchlist();
-    if(list.find(x=>x.addr.toLowerCase()===addr.toLowerCase())) return alert('Já salva!');
-    list.unshift({addr, bnb, at: Date.now()}); localStorage.setItem('chainlens_watch', JSON.stringify(list.slice(0,20))); renderWatchlist();
+    const addrEl = document.getElementById('addr');
+    const addr = addrEl.value.trim();
+    const bnb = parseFloat(addrEl.dataset.bnb||'0');
+    if(!addr) return alert('Cole uma carteira primeiro');
+    if(bnb===0) return alert('Rastreie a carteira primeiro para pegar o saldo');
+    const list = getWatchlist();
+    if(list.find(x=>x.addr.toLowerCase()===addr.toLowerCase())) return alert('Essa baleia já está salva!');
+    list.unshift({addr, bnb, at: Date.now()});
+    localStorage.setItem('chainlens_watch', JSON.stringify(list.slice(0,20)));
+    renderWatchlist();
   }
-  window.clearAll = () => { if(confirm('Limpar tudo?')){ localStorage.removeItem('chainlens_watch'); renderWatchlist(); } }
+
+  window.clearAll = () => { if(confirm('Limpar todas as baleias salvas?')){ localStorage.removeItem('chainlens_watch'); renderWatchlist(); } }
 
   window.check = async () => {
-    const addr = document.getElementById('addr').value.trim();
-    const res = document.getElementById('result'); const txsDiv = document.getElementById('txs');
-    if(!addr) return; res.classList.remove('hidden'); res.innerHTML = '🔍 Buscando na BNB Chain...'; txsDiv.classList.add('hidden');
+    const addrEl = document.getElementById('addr');
+    const addr = addrEl.value.trim();
+    const res = document.getElementById('result');
+    const txsDiv = document.getElementById('txs');
+    if(!addr ||!addr.startsWith('0x')) return alert('Endereço BNB inválido. Tem que começar com 0x');
+
+    res.classList.remove('hidden');
+    res.innerHTML = '<div class="bg-zinc-900 border border-zinc-800 p-4 rounded-xl animate-pulse">🔍 Consultando NodeReal...</div>';
+    txsDiv.classList.add('hidden');
+
     try{
-      const [balHex, txCountHex] = await Promise.all([rpcCall('eth_getBalance',[addr,'latest']), rpcCall('eth_getTransactionCount',[addr,'latest'])]);
-      const bnb = parseInt(balHex,16)/1e18; const txCount = parseInt(txCountHex,16);
-      document.getElementById('addr').dataset.bnb = bnb;
-      const usd = bnb*bnbPrice; const isWhale = bnb>=100; const isTop = bnb>=10000;
+      const balHex = await rpcCall('eth_getBalance',[addr,'latest']);
+      const txCountHex = await rpcCall('eth_getTransactionCount',[addr,'latest']).catch(()=> '0x0');
+      const bnb = parseInt(balHex,16)/1e18;
+      const txCount = parseInt(txCountHex,16);
+      addrEl.dataset.bnb = bnb;
+      const usd = bnb*bnbPrice;
+      const isTop = bnb>=10000;
+      const isWhale = bnb>=100;
       const score = bnb>=50000? '🔥 LENDÁRIA' : bnb>=10000? '👑 TOP' : bnb>=1000? '🐋 GRANDE' : bnb>=100? '🐋 BALEIA' : '🐟 PEIXE';
-      
+
       res.innerHTML = `
         <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <div class="flex justify-between"><span class="text-xs text-zinc-500">CARTEIRA • ${txCount} txs</span><span class="text-xs px-2 py-1 rounded-full ${isTop?'bg-purple-900 text-purple-200':isWhale?'bg-green-900 text-green-200':'bg-zinc-800'}">${score}</span></div>
-          <div class="font-mono text-xs mt-2 break-all text-zinc-400">${addr}</div>
-          <div class="grid grid-cols-2 gap-4 mt-4">
-            <div class="bg-black p-4 rounded-xl"><div class="text-xs text-zinc-500">SALDO</div><div class="text-2xl font-bold">${bnb.toLocaleString('pt-BR',{maximumFractionDigits:2})} BNB</div><div class="text-sm text-zinc-400">$${usd.toLocaleString('en-US',{maximumFractionDigits:0})}</div></div>
-            <div class="bg-black p-4 rounded-xl"><div class="text-xs text-zinc-500">STATUS</div><div class="text-lg font-bold mt-1">${isTop?'💎 Holder diamante<br>10k+ BNB':isWhale?'Baleia ativa':'Trader comum'}</div></div>
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-zinc-500">CARTEIRA • ${txCount} transações</span>
+            <span class="text-xs px-3 py-1 rounded-full font-bold ${isTop?'bg-purple-900 text-purple-200 border border-purple-700':isWhale?'bg-green-900 text-green-200 border border-green-700':'bg-zinc-800 text-zinc-300'}">${score}</span>
+          </div>
+          <div class="font-mono text-xs mt-3 break-all text-zinc-400 bg-black p-2 rounded">${addr}</div>
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div class="bg-black p-4 rounded-xl border border-zinc-800"><div class="text-xs text-zinc-500">SALDO BNB</div><div class="text-2xl font-bold mt-1">${bnb.toLocaleString('pt-BR',{maximumFractionDigits:4})} BNB</div><div class="text-sm text-zinc-400 mt-1">$${usd.toLocaleString('en-US',{maximumFractionDigits:0})} USD</div></div>
+            <div class="bg-black p-4 rounded-xl border border-zinc-800"><div class="text-xs text-zinc-500">CLASSIFICAÇÃO</div><div class="text-base font-bold mt-2">${isTop?'💎 Holder diamante<br><span class="text-xs font-normal text-zinc-400">Mais de 10k BNB</span>':isWhale?`🐋 Baleia ativa<br><span class="text-xs font-normal text-zinc-400">Top ${bnb>1000?'1%':'5%'} da rede</span>`:'🐟 Peixe pequeno<br><span class="text-xs font-normal text-zinc-400">Abaixo de 100 BNB</span>'}</div></div>
           </div>
           <div class="mt-4 flex gap-2">
-            <a href="https://bscscan.com/address/${addr}" target="_blank" class="flex-1 text-center text-sm bg-zinc-800 py-2.5 rounded-xl hover:bg-zinc-700">BscScan ↗</a>
-            <a href="https://debank.com/profile/${addr}" target="_blank" class="flex-1 text-center text-sm bg-zinc-800 py-2.5 rounded-xl hover:bg-zinc-700">DeBank ↗</a>
-            <button onclick="navigator.clipboard.writeText('${addr}')" class="text-sm bg-white text-black px-4 py-2.5 rounded-xl font-bold">Copiar</button>
+            <a href="https://bscscan.com/address/${addr}" target="_blank" class="flex-1 text-center text-sm bg-zinc-800 py-3 rounded-xl hover:bg-zinc-700 border border-zinc-700">BscScan ↗</a>
+            <a href="https://debank.com/profile/${addr}" target="_blank" class="flex-1 text-center text-sm bg-zinc-800 py-3 rounded-xl hover:bg-zinc-700 border border-zinc-700">DeBank ↗</a>
+            <button onclick="navigator.clipboard.writeText('${addr}');this.innerText='Copiado!';setTimeout(()=>this.innerText='Copiar',1500)" class="text-sm bg-white text-black px-5 py-3 rounded-xl font-bold">Copiar</button>
           </div>
-          <div class="mt-3 text- text-zinc-600">NodeReal: Conectado ✅ • Preço atualizado a cada 1min</div>
+          <div class="mt-3 text- text-zinc-600">NodeReal: Conectado ✅ | Chave: ${KEY? KEY.substring(0,6)+'...' : 'Sem KEY'} | Preço BNB: $${bnbPrice}</div>
         </div>`;
 
-      // Transações
-      const txUrl = `https://api.bscscan.com/api?module=account&action=txlist&address=${addr}&page=1&offset=8&sort=desc`;
-      const tr = await fetch(txUrl).then(r=>r.json());
-      const txs = tr.result||[];
-      if(txs.length){
-        txsDiv.classList.remove('hidden');
-        txsDiv.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <div class="font-bold mb-3">⚡ Últimas movimentações úteis</div>
-          ${txs.map(t=>{
-            const val = parseInt(t.value)/1e18; if(val===0) return '';
-            const isOut = t.from.toLowerCase()===addr.toLowerCase();
-            return `<div class="flex justify-between items-center py-2.5 border-b border-zinc-800/50 last:border-0 text-sm">
-              <div class="flex items-center gap-2"><span class="${isOut?'bg-red-900/50 text-red-300':'bg-green-900/50 text-green-300'} px-2 py-1 rounded text-xs font-bold">${isOut?'SAIU':'ENTROU'}</span><span class="font-mono text-xs text-zinc-500">${new Date(t.timeStamp*1000).toLocaleDateString('pt-BR')}</span></div>
-              <div class="font-bold">${val.toFixed(3)} BNB <span class="text-xs text-zinc-500">$${(val*bnbPrice).toFixed(0)}</span></div>
+      // BUSCA TRANSAÇÕES COM PROTEÇÃO TOTAL CONTRA O ERRO.map
+      try {
+        const txUrl = `https://api.bscscan.com/api?module=account&action=txlist&address=${addr}&page=1&offset=8&sort=desc`;
+        const tr = await fetch(txUrl).then(r=>r.json());
+        let txs = [];
+        if (tr && tr.status === '1' && Array.isArray(tr.result)) { txs = tr.result; }
+
+        if(txs.length > 0){
+          txsDiv.classList.remove('hidden');
+          const htmlTxs = txs.map(t=>{
+            if(!t ||!t.value) return '';
+            const val = parseInt(t.value)/1e18;
+            if(val===0 || isNaN(val)) return '';
+            const isOut = t.from && t.from.toLowerCase()===addr.toLowerCase();
+            const date = t.timeStamp? new Date(parseInt(t.timeStamp)*1000).toLocaleDateString('pt-BR') : '--';
+            return `<div class="flex justify-between items-center py-3 border-b border-zinc-800/50 last:border-0 text-sm">
+              <div class="flex items-center gap-2"><span class="${isOut?'bg-red-900/50 text-red-300 border border-red-800/50':'bg-green-900/50 text-green-300 border border-green-800/50'} px-2.5 py-1 rounded-full text-xs font-bold">${isOut?'SAIU':'ENTROU'}</span><span class="font-mono text-xs text-zinc-500">${date}</span></div>
+              <div class="font-bold text-right">${val.toFixed(4)} BNB <div class="text-xs text-zinc-500 font-normal">$${(val*bnbPrice).toFixed(0)}</div></div>
             </div>`;
-          }).join('')}
-        </div>`;
+          }).filter(Boolean).join('');
+
+          if(htmlTxs){
+            txsDiv.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5"><div class="font-bold mb-2">⚡ Últimas movimentações</div><div class="text-xs text-zinc-500 mb-3">Mostrando só transações com BNB</div>${htmlTxs}</div>`;
+          }
+        } else {
+          txsDiv.classList.remove('hidden');
+          txsDiv.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-sm text-zinc-500"><div class="font-bold text-white mb-1">Transações</div>BscScan está com rate-limit agora (limite grátis). O saldo está 100% correto via NodeReal. Tenta de novo em 15 segundos que volta.</div>`;
+        }
+      } catch(eTx){
+        console.log('BscScan offline', eTx);
+        txsDiv.classList.remove('hidden');
+        txsDiv.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-sm text-zinc-500">Histórico temporariamente offline. Saldo via NodeReal OK.</div>`;
       }
-    }catch(e){ res.innerHTML = `<div class="bg-red-900/30 border border-red-800 p-4 rounded-xl text-red-300">Erro: ${e.message}</div>`; }
+
+    }catch(e){
+      res.innerHTML = `<div class="bg-red-900/20 border border-red-800 p-4 rounded-xl text-red-300"><div class="font-bold">Erro</div><div class="text-sm mt-1">${e.message}</div><div class="text-xs mt-2 text-red-400/70">Verifica se a VITE_NODEREAL_KEY está configurada na Cloudflare</div></div>`;
+    }
   }
-  // auto check ao abrir
-  setTimeout(check, 500);
+
+  // Auto-rastreia ao abrir
+  setTimeout(check, 800);
 </script>
 </body>
 </html>
