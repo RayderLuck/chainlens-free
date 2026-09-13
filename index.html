@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>chainlens-free</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black text-white p-6">
+  <h1 class="text-3xl font-bold">🔭 chainlens-free</h1>
+  <p class="text-gray-400">BNB Chain tracker powered by NodeReal free tier</p>
+
+  <div class="mt-6 flex gap-2">
+    <input id="addr" placeholder="0x... carteira BNB" class="flex-1 p-3 rounded bg-zinc-900 border border-zinc-800">
+    <button onclick="check()" class="px-6 py-3 bg-white text-black rounded font-bold">Rastrear</button>
+  </div>
+
+  <div id="result" class="mt-6 p-4 bg-zinc-900 rounded hidden"></div>
+
+  <script type="module">
+    import { getWhaleTransactions } from "./src/core/whales.js";
+    window.check = async () => {
+      const addr = document.getElementById('addr').value;
+      const resultDiv = document.getElementById('result');
+      if(!addr) return alert('Cola uma carteira');
+      resultDiv.classList.remove('hidden');
+      resultDiv.innerHTML = '🔍 Consultando NodeReal...';
+      try {
+        const data = await getWhaleTransactions(addr, 10);
+        resultDiv.innerHTML = `
+          <div>Carteira: ${data.address}</div>
+          <div>Saldo: ${data.balanceBNB.toFixed(4)} BNB</div>
+          <div class="mt-2 ${data.isWhale ? 'text-green-400' : 'text-yellow-400'}">
+            ${data.isWhale ? '🐋 BALEIA DETECTADA' : '🐟 Peixe pequeno'}
+          </div>
+        `;
+      } catch(e) {
+        resultDiv.innerHTML = 'Erro: ' + e.message + '<br>Verifica sua NODEREAL_KEY';
+      }
+    }
+  </script>
+</body>
+</html>
