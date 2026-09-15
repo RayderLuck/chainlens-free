@@ -3,67 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>chainlens - NodeReal direto</title>
+<title>chainlens - NodeReal seguro</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-black text-white p-6">
 <div class="max-w-4xl mx-auto">
-<h1 class="text-3xl font-bold">🔭 chainlens - NodeReal direto</h1>
-<p class="text-zinc-500 text-xs">chamando nodereal.io direto, sem Functions</p>
+<h1 class="text-3xl font-bold">🔭 chainlens</h1>
+<p class="text-zinc-500 text-xs">NodeReal via /api/rpc • key escondida</p>
 <div class="flex gap-2 mt-4">
 <input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm" value="0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c">
 <button onclick="check()" class="px-6 bg-white text-black rounded-xl font-bold">Rastrear</button>
 </div>
 <div id="status" class="mt-4 text-xs text-zinc-500"></div>
 <div id="chains" class="mt-4 grid grid-cols-2 gap-3"></div>
-<div id="debug" class="mt-4 text- text-zinc-600 font-mono whitespace-pre-wrap"></div>
 </div>
 <script>
-const KEY='0c4e57cb1b644b4c96b5fe273a9384da';
 const CHAINS=[
-{id:'1',name:'Ethereum',url:`https://eth-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://etherscan.io'},
-{id:'56',name:'BSC',url:`https://bsc-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://bscscan.com'},
-{id:'137',name:'Polygon',url:`https://polygon-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://polygonscan.com'},
-{id:'8453',name:'Base',url:`https://base-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://basescan.org'},
-{id:'42161',name:'Arbitrum',url:`https://arbitrum-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://arbiscan.io'},
-{id:'10',name:'Optimism',url:`https://opt-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://optimistic.etherscan.io'},
-{id:'43114',name:'Avalanche',url:`https://avalanche-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://snowtrace.io'},
-{id:'59144',name:'Linea',url:`https://linea-mainnet.nodereal.io/v1/${KEY}`,explorer:'https://lineascan.build'},
+{id:'1',name:'Ethereum',explorer:'https://etherscan.io'},
+{id:'56',name:'BSC',explorer:'https://bscscan.com'},
+{id:'137',name:'Polygon',explorer:'https://polygonscan.com'},
+{id:'8453',name:'Base',explorer:'https://basescan.org'},
+{id:'42161',name:'Arbitrum',explorer:'https://arbiscan.io'},
+{id:'10',name:'Optimism',explorer:'https://optimistic.etherscan.io'},
+{id:'43114',name:'Avalanche',explorer:'https://snowtrace.io'},
+{id:'59144',name:'Linea',explorer:'https://lineascan.build'},
 ];
-async function getCode(url,addr){
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_getCode',params:[addr,'latest']})});
+async function getCode(chainId, addr){
+  const r=await fetch(`/api/rpc?chain=${chainId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_getCode',params:[addr,'latest']})});
   const j=await r.json();
-  if(j.error) throw new Error(j.error.message);
   return j.result;
-}
-async function getName(url,addr){
-  try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:addr,data:'0x06fdde03'},'latest']})});
-    const j=await r.json(); return j.result;
-  }catch{return '0x'}
 }
 window.check=async()=>{
   const addr=document.getElementById('addr').value.trim();
   const chainsEl=document.getElementById('chains');
   const status=document.getElementById('status');
-  const debug=document.getElementById('debug');
-  status.textContent='Varrendo via NodeReal direto...';
+  status.textContent='Varrendo 8 chains via NodeReal (key escondida)...';
   chainsEl.innerHTML=CHAINS.map(c=>`<div class="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl animate-pulse">${c.name}...</div>`).join('');
   const res=await Promise.all(CHAINS.map(async (c,i)=>{
     await new Promise(r=>setTimeout(r,i*200));
-    try{
-      const code=await getCode(c.url,addr);
-      const found=code&&code!=='0x'&&code.length>10;
-      return {c,found,codeLen:found?(code.length-2)/2:0,raw:code.slice(0,100)};
-    }catch(e){return {c,found:false,err:e.message};}
+    try{const code=await getCode(c.id,addr); const found=code&&code!=='0x'&&code.length>10; return {c,found,len:found?(code.length-2)/2:0}}catch{return {c,found:false}}
   }));
   chainsEl.innerHTML=res.map(r=>{
-    if(r.found) return `<div class="bg-zinc-900 border border-green-900/50 rounded-xl p-4"><div class="font-bold text-green-400">${r.c.name} • ENCONTRADO ✅</div><div class="text-xs text-zinc-500">${r.codeLen} bytes</div><a href="${r.c.explorer}/address/${addr}" target="_blank" class="text-xs bg-white text-black px-2 py-1 rounded-full mt-2 inline-block">Explorer</a></div>`;
-    return `<div class="bg-zinc-900/30 border border-zinc-800 border-dashed p-3 rounded-xl opacity-60 text-xs text-zinc-500">${r.c.name} • não encontrado<br><span class="text-">${(r.err||'').slice(0,80)}</span></div>`;
+    if(r.found) return `<div class="bg-zinc-900 border border-green-900/50 rounded-xl p-4"><div class="font-bold text-green-400">${r.c.name} • ENCONTRADO ✅</div><div class="text-xs text-zinc-500">${r.len} bytes • via NodeReal</div><a href="${r.c.explorer}/address/${addr}" target="_blank" class="text-xs bg-white text-black px-2 py-1 rounded-full mt-2 inline-block">Explorer</a></div>`;
+    return `<div class="bg-zinc-900/30 border border-zinc-800 border-dashed p-3 rounded-xl opacity-60 text-xs text-zinc-500">${r.c.name} • não encontrado</div>`;
   }).join('');
-  const f=res.filter(r=>r.found).length;
-  status.textContent=`✅ NodeReal direto: ${f} de ${CHAINS.length} chains`;
-  debug.textContent=`RAW BSC: ${JSON.stringify(res.find(r=>r.c.id==='56'),null,2)}`;
+  status.textContent=`✅ ${res.filter(r=>r.found).length} de ${CHAINS.length} chains - NodeReal seguro`;
 }
 setTimeout(check,500);
 </script>
