@@ -1,35 +1,31 @@
-# 🔭 chainlens-free
-Real-time BNB Chain tracker 100% powered by NodeReal free tier
+# 🔭 chainlens
 
-> DeBank open-source que você hospeda de graça na Cloudflare. Sem cartão, sem telefone.
+**ONDE TÁ ESSE ENDEREÇO?**
 
-**LIVE:** https://chainlens-free.pages.dev/
+Cola qualquer endereço 0x... e descobre na hora se é carteira ou contrato e em qual rede ele existe.
 
-### O que faz (v1)
-- [x] Rastrear carteira: de onde veio / pra onde foi o dinheiro + saldo em USD
-- [x] Detectar baleias > $10k - classificação PEIXE / BALEIA / TOP / LENDÁRIA
-- [x] Histórico útil: últimas 8 movimentações ENTRADA / SAÍDA com data BR
-- [x] Watchlist pessoal: salva suas baleias no navegador (⭐)
-- [ ] Alerta de movimentação (v2)
-- [ ] NFT sales tracker (v2)
+**Tá no ar:** https://chainlens-free.pages.dev/
 
-### Stack grátis
-- NodeReal RPC - bsc-mainnet.nodereal.io
-- Cloudflare Pages - hospedagem sem telefone
-- GitHub Codespaces - codar sem PC
-- CoinGecko API - preço do BNB
+### O que faz hoje
+Você cola o endereço e ele varre 8 redes de uma vez (Ethereum, BSC, Polygon, Base, Arbitrum, Optimism, Avalanche, Linea) e te mostra:
 
-### Como usar
-1. Acesse https://chainlens-free.pages.dev/
-2. Cole qualquer carteira 0x... da BNB Chain
-3. Clique em Rastrear
-4. Salve com ⭐
+- É carteira? Mostra onde você pode explorar ela
+- É contrato? Mostra em quais redes ele tá e quantos bytes tem
+- Tudo com link direto pro explorador oficial
 
-### Deploy
-1. Fork esse repo
-2. Cloudflare Pages > Create > Connect Git
-3. Build: `npm run build` | Output: `dist`
-4. Env var: `VITE_NODEREAL_KEY` = sua key da NodeReal
+Sem cadastro, sem carteira conectada, sem pegadinha.
+
+### Aviso: ainda estamos construindo
+
+> Estamos em desenvolvimento ativo.
+
+Isso aqui ainda é o começo. Hoje só mostra onde o endereço existe. Ainda estamos trabalhando pra trazer saldo, histórico, preço e detecção automática de golpe.
+
+A ideia é virar uma praça pública: um lugar onde só entra token auditado pela comunidade, sem dono, sem corretora por trás. Bem público mesmo.
+
+Por enquanto a gente garante uma coisa: nada de chave exposta, nada de rastreio. Sua pesquisa é só sua.
 
 ---
-Feito com 1 index.html. Sem cartão, sem telefone.
+Feito na raça, 100% grátis, open source.
+
+v0.3 • BETA • em obra
