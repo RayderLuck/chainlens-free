@@ -3,53 +3,99 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>chainlens - NodeReal seguro</title>
+<title>chainlens - carteira ou contrato</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-black text-white p-6">
-<div class="max-w-4xl mx-auto">
-<h1 class="text-3xl font-bold">🔭 chainlens</h1>
-<p class="text-zinc-500 text-xs">NodeReal via /api/rpc • key escondida</p>
-<div class="flex gap-2 mt-4">
-<input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm" value="0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c">
-<button onclick="check()" class="px-6 bg-white text-black rounded-xl font-bold">Rastrear</button>
+<body class="bg-black text-white p-4 md:p-8 min-h-screen">
+<div class="max-w-5xl mx-auto">
+  <h1 class="text-3xl font-bold">🔭 chainlens</h1>
+  <p class="text-zinc-500 text-xs">detecta carteira vs contrato • 8 chains • só NodeReal</p>
+
+  <div class="flex gap-2 mt-6">
+    <input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm outline-none focus:border-white" placeholder="cole carteira ou contrato 0x..." value="">
+    <button id="btn" onclick="check()" class="px-6 py-3 bg-white text-black rounded-xl font-bold">Rastrear</button>
+  </div>
+
+  <div id="status" class="mt-4 text-xs text-zinc-500"></div>
+  <div id="chains" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
 </div>
-<div id="status" class="mt-4 text-xs text-zinc-500"></div>
-<div id="chains" class="mt-4 grid grid-cols-2 gap-3"></div>
-</div>
+
 <script>
-const CHAINS=[
-{id:'1',name:'Ethereum',explorer:'https://etherscan.io'},
-{id:'56',name:'BSC',explorer:'https://bscscan.com'},
-{id:'137',name:'Polygon',explorer:'https://polygonscan.com'},
-{id:'8453',name:'Base',explorer:'https://basescan.org'},
-{id:'42161',name:'Arbitrum',explorer:'https://arbiscan.io'},
-{id:'10',name:'Optimism',explorer:'https://optimistic.etherscan.io'},
-{id:'43114',name:'Avalanche',explorer:'https://snowtrace.io'},
-{id:'59144',name:'Linea',explorer:'https://lineascan.build'},
+const CHAINS = [
+  {id:'56', name:'BSC', exp:'https://bscscan.com', native:'BNB'},
+  {id:'1', name:'Ethereum', exp:'https://etherscan.io', native:'ETH'},
+  {id:'137', name:'Polygon', exp:'https://polygonscan.com', native:'MATIC'},
+  {id:'8453', name:'Base', exp:'https://basescan.org', native:'ETH'},
+  {id:'42161', name:'Arbitrum', exp:'https://arbiscan.io', native:'ETH'},
+  {id:'10', name:'Optimism', exp:'https://optimistic.etherscan.io', native:'ETH'},
+  {id:'43114', name:'Avalanche', exp:'https://snowtrace.io', native:'AVAX'},
+  {id:'59144', name:'Linea', exp:'https://lineascan.build', native:'ETH'},
 ];
-async function getCode(chainId, addr){
-  const r=await fetch(`/api/rpc?chain=${chainId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_getCode',params:[addr,'latest']})});
-  const j=await r.json();
+
+async function rpc(chain, method, params){
+  const r = await fetch(`/api/rpc?chain=${chain}`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:'2.0', id:1, method, params})});
+  const j = await r.json();
   return j.result;
 }
-window.check=async()=>{
-  const addr=document.getElementById('addr').value.trim();
-  const chainsEl=document.getElementById('chains');
-  const status=document.getElementById('status');
-  status.textContent='Varrendo 8 chains via NodeReal (key escondida)...';
-  chainsEl.innerHTML=CHAINS.map(c=>`<div class="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl animate-pulse">${c.name}...</div>`).join('');
-  const res=await Promise.all(CHAINS.map(async (c,i)=>{
+
+window.check = async () => {
+  const addr = document.getElementById('addr').value.trim();
+  if(!addr.startsWith('0x') || addr.length!==42) return alert('Endereço inválido');
+  const chainsEl = document.getElementById('chains');
+  const status = document.getElementById('status');
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  status.textContent = '🔍 Varrendo 8 chains via NodeReal...';
+  chainsEl.innerHTML = CHAINS.map(c=>`<div class="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl animate-pulse">${c.name}...</div>`).join('');
+
+  const results = await Promise.all(CHAINS.map(async (c,i)=>{
     await new Promise(r=>setTimeout(r,i*200));
-    try{const code=await getCode(c.id,addr); const found=code&&code!=='0x'&&code.length>10; return {c,found,len:found?(code.length-2)/2:0}}catch{return {c,found:false}}
+    try{
+      const code = await rpc(c.id, 'eth_getCode', [addr, 'latest']);
+      const isContract = code && code!=='0x' && code.length>10;
+
+      if(isContract){
+        // é contrato -> pega info
+        const r = await fetch(`/api/tokeninfo?address=${addr}&chain=${c.id}`);
+        const j = await r.json();
+        if(j.status==='1') return {c, type:'contract', data:j.result[0]};
+        return {c, type:'contract', data:{tokenName:'Contrato', symbol:'?', decimals:0}};
+      }else{
+        // é carteira -> pega saldo
+        const r = await fetch(`/api/wallet?address=${addr}&chain=${c.id}`);
+        const j = await r.json();
+        const hasBalance = (j.native && j.native!=='0x0' && j.native!=='0x') || (j.tokens && j.tokens.length>0);
+        if(hasBalance) return {c, type:'wallet', data:j};
+        return {c, type:'empty'};
+      }
+    }catch(e){ return {c, type:'error', err:e.message}; }
   }));
-  chainsEl.innerHTML=res.map(r=>{
-    if(r.found) return `<div class="bg-zinc-900 border border-green-900/50 rounded-xl p-4"><div class="font-bold text-green-400">${r.c.name} • ENCONTRADO ✅</div><div class="text-xs text-zinc-500">${r.len} bytes • via NodeReal</div><a href="${r.c.explorer}/address/${addr}" target="_blank" class="text-xs bg-white text-black px-2 py-1 rounded-full mt-2 inline-block">Explorer</a></div>`;
-    return `<div class="bg-zinc-900/30 border border-zinc-800 border-dashed p-3 rounded-xl opacity-60 text-xs text-zinc-500">${r.c.name} • não encontrado</div>`;
+
+  chainsEl.innerHTML = results.map(r=>{
+    if(r.type==='contract'){
+      return `<div class="bg-zinc-900 border border-violet-900/50 rounded-xl p-4">
+        <div class="flex justify-between"><span class="font-bold text-violet-300">${r.c.name}</span><span class="text- bg-violet-600 px-2 py-1 rounded-full">CONTRATO</span></div>
+        <div class="mt-2 font-bold">${r.data.tokenName} (${r.data.symbol})</div>
+        <div class="text-xs text-zinc-500">decimals: ${r.data.decimals}</div>
+        <a href="${r.c.exp}/address/${r.data.contractAddress || document.getElementById('addr').value.trim()}" target="_blank" class="text-xs mt-2 inline-block bg-white text-black px-3 py-1 rounded-full font-bold">Ver no Explorer ↗</a>
+      </div>`;
+    }
+    if(r.type==='wallet'){
+      const eth = r.data.native? (parseInt(r.data.native,16)/1e18).toFixed(5) : '0';
+      const tokens = r.data.tokens?.map(t=>`<div class="text-xs">${t.token}: ${t.balance}</div>`).join('') || '<div class="text-xs text-zinc-600">sem tokens mapeados</div>';
+      return `<div class="bg-zinc-900 border border-green-900/50 rounded-xl p-4">
+        <div class="flex justify-between"><span class="font-bold text-green-400">${r.c.name}</span><span class="text- bg-green-600 px-2 py-1 rounded-full">CARTEIRA</span></div>
+        <div class="mt-2 text-sm">Saldo: <b>${eth} ${r.c.native}</b></div>
+        <div class="mt-1">${tokens}</div>
+      </div>`;
+    }
+    return `<div class="bg-zinc-900/20 border border-zinc-800 border-dashed p-4 rounded-xl opacity-40"><div class="text-xs text-zinc-600">${r.c.name} • vazio</div></div>`;
   }).join('');
-  status.textContent=`✅ ${res.filter(r=>r.found).length} de ${CHAINS.length} chains - NodeReal seguro`;
+
+  const found = results.filter(r=>r.type!=='empty' && r.type!=='error').length;
+  status.textContent = `✅ Encontrado em ${found} de 8 chains`;
+  btn.disabled = false;
 }
-setTimeout(check,500);
 </script>
 </body>
 </html>
