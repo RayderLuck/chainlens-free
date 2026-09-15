@@ -1,42 +1,29 @@
-export async function onRequest(context) {
-  try {
-    const { request, env } = context;
-    const key = env.VITE_NODEREAL_KEY || env.NODEREAL_KEY || env.NODEREAL || env.KEY;
-    
-    if (!key) {
-      return new Response(JSON.stringify({ 
-        error: true,
-        message: 'KEY não encontrada',
-        env_keys: Object.keys(env),
-        help: 'Cloudflare Pages > Settings > Variables > Production > adicione VITE_NODEREAL_KEY'
-      }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
-    }
+const NODE_MAP = {
+  '1': 'eth-mainnet',
+  '56': 'bsc-mainnet',
+  '137': 'polygon-mainnet',
+  '8453': 'base-mainnet',
+  '42161': 'arbitrum-mainnet',
+  '10': 'opt-mainnet',
+  '43114': 'avalanche-mainnet',
+  '59144': 'linea-mainnet'
+};
 
-    let bodyText = await request.text();
-    if (!bodyText) {
-      bodyText = JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_blockNumber', params:[] });
-    }
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  const body = await request.json();
+  const url = new URL(request.url);
+  const chain = url.searchParams.get('chain') || '56';
+  const key = env.NODEREAL_KEY || env.VITE_NODEREAL_KEY;
+  const network = NODE_MAP[chain] || 'bsc-mainnet';
 
-    const target = `https://bsc-mainnet.nodereal.io/v1/${key.trim()}`;
-    const res = await fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: bodyText
-    });
-    const text = await res.text();
-    
-    return new Response(text, {
-      status: res.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
+  const noderealUrl = `https://${network}.nodereal.io/v1/${key}`;
 
-  } catch (e) {
-    return new Response(JSON.stringify({ error: true, message: e.message }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-    });
-  }
+  const resp = await fetch(noderealUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await resp.text();
+  return new Response(data, { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
 }
