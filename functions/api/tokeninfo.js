@@ -1,48 +1,36 @@
-export async function onRequest(context) {
-  try {
-    const { request, env } = context;
-    
-    // Pega a key - tenta todos os nomes possíveis
-    const key = env.VITE_NODEREAL_KEY || env.NODEREAL_KEY || env.NODEREAL || env.KEY;
-    
-    if (!key) {
-      return new Response(JSON.stringify({ 
-        error: true,
-        message: 'KEY não encontrada',
-        env_keys: Object.keys(env),
-        help: 'Vá em Cloudflare Pages > Settings > Variables > Production e adicione VITE_NODEREAL_KEY'
-      }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
-    }
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const address = url.searchParams.get('address');
+  const chain = url.searchParams.get('chain') || '56';
+  const action = url.searchParams.get('action') || 'tokeninfo';
 
-    // Se for GET sem body, testa com eth_blockNumber
-    let bodyText = await request.text();
-    if (!bodyText) {
-      bodyText = JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_blockNumber', params:[] });
-    }
+  const apiKey = env.ETHERSCAN_V2_KEY || env.VITE_ETHERSCAN_V2_KEY || env.ETHERSCAN_API_KEY;
 
-    const target = `https://bsc-mainnet.nodereal.io/v1/${key.trim()}`;
-
-    const res = await fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: bodyText
-    });
-
-    const text = await res.text();
-    
-    // Se NodeReal retornar erro, passa pra frente como JSON
-    return new Response(text, {
-      status: res.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
-
-  } catch (e) {
-    return new Response(JSON.stringify({ error: true, message: e.message, stack: e.stack }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-    });
+  if (!apiKey) {
+    return new Response(JSON.stringify({ 
+      status: '0', 
+      message: 'API KEY NÃO ENCONTRADA NA FUNCTION', 
+      result: `Vars: ${Object.keys(env).join(', ')}`
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
+
+  let etherscanUrl;
+  if (action === 'tokeninfo') {
+    etherscanUrl = `https://api.etherscan.io/v2/api?chainid=${chain}&module=token&action=tokeninfo&contractaddress=${address}&apikey=${apiKey}`;
+  } else {
+    etherscanUrl = `https://api.etherscan.io/v2/api?chainid=${chain}&module=account&action=tokentx&contractaddress=${address}&page=1&offset=10&sort=desc&apikey=${apiKey}`;
+  }
+
+  const resp = await fetch(etherscanUrl);
+  const data = await resp.json();
+
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, max-age=60'
+    }
+  });
 }
