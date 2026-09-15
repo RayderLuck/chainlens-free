@@ -3,49 +3,102 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>chainlens - onde está a carteira</title>
+<title>ChainLens • Onde tá o contrato</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  *{font-family:'Inter',sans-serif}
+ .mono{font-family:'JetBrains Mono',monospace}
+ .glass{backdrop-filter: blur(20px); background: rgba(24,24,27,0.6);}
+ .glow{box-shadow: 0 0 80px rgba(139,92,246,0.15);}
+</style>
 </head>
-<body class="bg-black text-white p-6">
-<div class="max-w-3xl mx-auto">
-<h1 class="text-3xl font-bold">🔭 chainlens</h1>
-<p class="text-zinc-500 text-xs">cole a carteira e descubra em qual blockchain ela tem saldo</p>
-
-<div class="flex gap-2 mt-6">
-<input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm" placeholder="0x... sua carteira">
-<button onclick="check()" class="px-6 bg-white text-black rounded-xl font-bold">Achar blockchain</button>
+<body class="bg-[#050507] text-white min-h-screen relative overflow-x-hidden">
+<!-- bg gradients -->
+<div class="fixed inset-0 -z-10">
+  <div class="absolute -top-[40%] left-1/2 -translate-x-1/2 w-[120%] h-[80%] bg-[radial-gradient(ellipse_at_center,_rgba(139,92,246,0.15),transparent_70%)]"></div>
+  <div class="absolute top-[20%] -left-[10%] w-[60%] h-[60%] bg-[radial-gradient(ellipse_at_center,_rgba(59,130,246,0.12),transparent_70%)]"></div>
+  <div class="absolute bottom-0 right-0 w-[80%] h-[60%] bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.08),transparent_70%)]"></div>
 </div>
 
-<div id="out" class="mt-6"></div>
+<div class="max-w-2xl mx-auto px-6 py-12 md:py-20">
+  <!-- header -->
+  <div class="text-center mb-10">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text- tracking-widest text-zinc-400 mb-4">NODE REAL • 8 CHAINS • ETH_GETCODE</div>
+    <h1 class="text-5xl md:text-6xl font-[800] tracking-tighter leading-[0.9]">Onde tá<br><span class="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">o contrato?</span></h1>
+    <p class="text-zinc-500 mt-4 text-sm">Cole qualquer endereço. Eu varro 8 blockchains e te mostro onde ele existe.</p>
+  </div>
+
+  <!-- input card -->
+  <div class="glass glow border border-zinc-800 rounded- p-2 flex gap-2">
+    <input id="a" class="flex-1 bg-transparent outline-none px-5 py-4 mono text-sm placeholder:text-zinc-600" placeholder="0x..." spellcheck="false">
+    <button onclick="go()" id="btn" class="bg-white text-black font-bold px-7 rounded- hover:bg-zinc-200 transition text-sm">SCAN</button>
+  </div>
+  <div id="hint" class="text-center mt-3 text- text-zinc-600 mono">ENTER pra escanear • suportado: EVM 0x...</div>
+
+  <!-- results -->
+  <div id="out" class="mt-8 space-y-3"></div>
+
+  <!-- footer -->
+  <div class="mt-16 text-center text- text-zinc-700 mono">built with NodeReal • no Etherscan API • key escondida em /api/scan</div>
 </div>
 
 <script>
-const NAMES = {'1':'Ethereum','56':'BSC (BNB Chain)','137':'Polygon','8453':'Base','42161':'Arbitrum','10':'Optimism','43114':'Avalanche','59144':'Linea'};
+const N = {'1':['Ethereum','ETH'],'56':['BNB Chain','BNB'],'137':['Polygon','MATIC'],'8453':['Base','ETH'],'42161':['Arbitrum','ETH'],'10':['Optimism','ETH'],'43114':['Avalanche','AVAX'],'59144':['Linea','ETH']};
+const E = {'1':'https://etherscan.io/address/','56':'https://bscscan.com/address/','137':'https://polygonscan.com/address/','8453':'https://basescan.org/address/','42161':'https://arbiscan.io/address/','10':'https://optimistic.etherscan.io/address/','43114':'https://snowtrace.io/address/','59144':'https://lineascan.build/address/'};
 
-async function check(){
-  const addr = document.getElementById('addr').value.trim();
+async function go(){
+  const addr = document.getElementById('a').value.trim();
   const out = document.getElementById('out');
-  out.innerHTML = '<div class="text-zinc-500 text-sm animate-pulse">Varrendo 8 blockchains via NodeReal...</div>';
+  const btn = document.getElementById('btn');
+  if(!addr.startsWith('0x')||addr.length!=42){ out.innerHTML = `<div class="glass border border-red-900/50 p-4 rounded-2xl text-sm text-red-300">Endereço inválido. Tem que ser 0x + 40 chars.</div>`; return; }
 
-  const r = await fetch(`/api/wallet?address=${addr}`);
-  const j = await r.json();
+  btn.textContent = '...'; btn.disabled = true;
+  out.innerHTML = `<div class="glass border border-zinc-800 rounded-2xl p-8 text-center">
+    <div class="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin mx-auto"></div>
+    <div class="mt-3 text-xs text-zinc-500 mono">eth_getCode em 8 chains via NodeReal</div>
+    <div class="mt-2 flex justify-center gap-1">${Object.keys(N).map((_,i)=>`<div class="w-1 h-1 bg-zinc-700 rounded-full animate-pulse" style="animation-delay:${i*100}ms"></div>`).join('')}</div>
+  </div>`;
 
-  const comSaldo = j.chains.filter(c=>c.has);
-  
-  if(comSaldo.length===0){
-    out.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">Essa carteira <span class="font-mono text-xs">${addr.slice(0,10)}...</span> não tem saldo nativo em nenhuma das 8 chains verificadas.<br><span class="text-xs text-zinc-500">Ela existe em todas, mas está vazia.</span></div>`;
-    return;
+  try{
+    const r = await fetch(`/api/scan?address=${addr}`);
+    const all = await r.json();
+    const found = all.filter(x=>x.exists);
+
+    if(found.length==0){
+      out.innerHTML = `<div class="glass border border-zinc-800 rounded- p-6 text-center">
+        <div class="text-3xl">👛</div>
+        <div class="mt-2 font-semibold">Não é contrato</div>
+        <div class="text-xs text-zinc-500 mt-1 mono">${addr.slice(0,12)}...${addr.slice(-6)} é uma carteira EOA.<br>Carteiras não têm código, por isso não aparecem em nenhuma chain.</div>
+      </div>`;
+    }else{
+      out.innerHTML = `
+        <div class="flex items-center justify-between mb-2 px-1">
+          <div class="text-xs text-zinc-500 mono">${found.length} CONTRATO${found.length>1?'S':''} ENCONTRADO${found.length>1?'S':''}</div>
+          <div class="text- bg-violet-500/20 text-violet-300 border border-violet-500/20 px-2 py-1 rounded-full mono">${addr.slice(0,6)}...${addr.slice(-4)}</div>
+        </div>
+        ${found.map(f=>`
+          <div class="group glass border border-zinc-800 hover:border-zinc-700 rounded- p-5 flex justify-between items-center transition-all hover:scale-[1.01]">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 rounded-full bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 flex items-center justify-center text-xs font-bold">${N[f.id][0][0]}</div>
+              <div>
+                <div class="font-semibold">${N[f.id][0]} <span class="text-zinc-600 text-xs">• ${f.id}</span></div>
+                <div class="text- text-zinc-500 mono">${f.len} bytes • ${N[f.id][1]} chain</div>
+              </div>
+            </div>
+            <a href="${E[f.id]}${addr}" target="_blank" class="bg-white text-black px-4 py-2 rounded-full text-xs font-bold group-hover:bg-zinc-100 transition">Explorer ↗</a>
+          </div>
+        `).join('')}
+        <div class="text- text-zinc-600 mono px-1 pt-2">Não encontrado em: ${all.filter(x=>!x.exists).map(x=>N[x.id][0]).join(' • ')}</div>
+      `;
+    }
+  }catch(e){
+    out.innerHTML = `<div class="glass border border-red-900/50 p-4 rounded-2xl text-sm">Erro: ${e.message}</div>`;
+  }finally{
+    btn.textContent = 'SCAN'; btn.disabled = false;
   }
-
-  out.innerHTML = `<div class="mb-3 text-green-400 font-bold">✅ Carteira encontrada em ${comSaldo.length} blockchain(s):</div>` + 
-  comSaldo.map(c=>{
-    const eth = (Number(BigInt(c.hex))/1e18).toFixed(6);
-    return `<div class="bg-zinc-900 border border-green-900/50 p-4 rounded-xl mb-2 flex justify-between items-center">
-      <div><div class="font-bold">${NAMES[c.chain]} - ${c.chain}</div><div class="text-xs text-zinc-500">Saldo: ${eth} ${c.chain=='56'?'BNB':c.chain=='137'?'MATIC':c.chain=='43114'?'AVAX':'ETH'}</div></div>
-      <div class="text- bg-green-600 px-3 py-1 rounded-full">TEM SALDO</div>
-    </div>`;
-  }).join('');
 }
+document.getElementById('a').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
 </script>
 </body>
 </html>
