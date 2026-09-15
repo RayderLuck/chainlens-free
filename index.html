@@ -3,98 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>chainlens - carteira ou contrato</title>
+<title>chainlens - onde está a carteira</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-black text-white p-4 md:p-8 min-h-screen">
-<div class="max-w-5xl mx-auto">
-  <h1 class="text-3xl font-bold">🔭 chainlens</h1>
-  <p class="text-zinc-500 text-xs">detecta carteira vs contrato • 8 chains • só NodeReal</p>
+<body class="bg-black text-white p-6">
+<div class="max-w-3xl mx-auto">
+<h1 class="text-3xl font-bold">🔭 chainlens</h1>
+<p class="text-zinc-500 text-xs">cole a carteira e descubra em qual blockchain ela tem saldo</p>
 
-  <div class="flex gap-2 mt-6">
-    <input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm outline-none focus:border-white" placeholder="cole carteira ou contrato 0x..." value="">
-    <button id="btn" onclick="check()" class="px-6 py-3 bg-white text-black rounded-xl font-bold">Rastrear</button>
-  </div>
+<div class="flex gap-2 mt-6">
+<input id="addr" class="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-sm" placeholder="0x... sua carteira">
+<button onclick="check()" class="px-6 bg-white text-black rounded-xl font-bold">Achar blockchain</button>
+</div>
 
-  <div id="status" class="mt-4 text-xs text-zinc-500"></div>
-  <div id="chains" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+<div id="out" class="mt-6"></div>
 </div>
 
 <script>
-const CHAINS = [
-  {id:'56', name:'BSC', exp:'https://bscscan.com', native:'BNB'},
-  {id:'1', name:'Ethereum', exp:'https://etherscan.io', native:'ETH'},
-  {id:'137', name:'Polygon', exp:'https://polygonscan.com', native:'MATIC'},
-  {id:'8453', name:'Base', exp:'https://basescan.org', native:'ETH'},
-  {id:'42161', name:'Arbitrum', exp:'https://arbiscan.io', native:'ETH'},
-  {id:'10', name:'Optimism', exp:'https://optimistic.etherscan.io', native:'ETH'},
-  {id:'43114', name:'Avalanche', exp:'https://snowtrace.io', native:'AVAX'},
-  {id:'59144', name:'Linea', exp:'https://lineascan.build', native:'ETH'},
-];
+const NAMES = {'1':'Ethereum','56':'BSC (BNB Chain)','137':'Polygon','8453':'Base','42161':'Arbitrum','10':'Optimism','43114':'Avalanche','59144':'Linea'};
 
-async function rpc(chain, method, params){
-  const r = await fetch(`/api/rpc?chain=${chain}`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:'2.0', id:1, method, params})});
-  const j = await r.json();
-  return j.result;
-}
-
-window.check = async () => {
+async function check(){
   const addr = document.getElementById('addr').value.trim();
-  if(!addr.startsWith('0x') || addr.length!==42) return alert('Endereço inválido');
-  const chainsEl = document.getElementById('chains');
-  const status = document.getElementById('status');
-  const btn = document.getElementById('btn');
-  btn.disabled = true;
-  status.textContent = '🔍 Varrendo 8 chains via NodeReal...';
-  chainsEl.innerHTML = CHAINS.map(c=>`<div class="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl animate-pulse">${c.name}...</div>`).join('');
+  const out = document.getElementById('out');
+  out.innerHTML = '<div class="text-zinc-500 text-sm animate-pulse">Varrendo 8 blockchains via NodeReal...</div>';
 
-  const results = await Promise.all(CHAINS.map(async (c,i)=>{
-    await new Promise(r=>setTimeout(r,i*200));
-    try{
-      const code = await rpc(c.id, 'eth_getCode', [addr, 'latest']);
-      const isContract = code && code!=='0x' && code.length>10;
+  const r = await fetch(`/api/wallet?address=${addr}`);
+  const j = await r.json();
 
-      if(isContract){
-        // é contrato -> pega info
-        const r = await fetch(`/api/tokeninfo?address=${addr}&chain=${c.id}`);
-        const j = await r.json();
-        if(j.status==='1') return {c, type:'contract', data:j.result[0]};
-        return {c, type:'contract', data:{tokenName:'Contrato', symbol:'?', decimals:0}};
-      }else{
-        // é carteira -> pega saldo
-        const r = await fetch(`/api/wallet?address=${addr}&chain=${c.id}`);
-        const j = await r.json();
-        const hasBalance = (j.native && j.native!=='0x0' && j.native!=='0x') || (j.tokens && j.tokens.length>0);
-        if(hasBalance) return {c, type:'wallet', data:j};
-        return {c, type:'empty'};
-      }
-    }catch(e){ return {c, type:'error', err:e.message}; }
-  }));
+  const comSaldo = j.chains.filter(c=>c.has);
+  
+  if(comSaldo.length===0){
+    out.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">Essa carteira <span class="font-mono text-xs">${addr.slice(0,10)}...</span> não tem saldo nativo em nenhuma das 8 chains verificadas.<br><span class="text-xs text-zinc-500">Ela existe em todas, mas está vazia.</span></div>`;
+    return;
+  }
 
-  chainsEl.innerHTML = results.map(r=>{
-    if(r.type==='contract'){
-      return `<div class="bg-zinc-900 border border-violet-900/50 rounded-xl p-4">
-        <div class="flex justify-between"><span class="font-bold text-violet-300">${r.c.name}</span><span class="text- bg-violet-600 px-2 py-1 rounded-full">CONTRATO</span></div>
-        <div class="mt-2 font-bold">${r.data.tokenName} (${r.data.symbol})</div>
-        <div class="text-xs text-zinc-500">decimals: ${r.data.decimals}</div>
-        <a href="${r.c.exp}/address/${r.data.contractAddress || document.getElementById('addr').value.trim()}" target="_blank" class="text-xs mt-2 inline-block bg-white text-black px-3 py-1 rounded-full font-bold">Ver no Explorer ↗</a>
-      </div>`;
-    }
-    if(r.type==='wallet'){
-      const eth = r.data.native? (parseInt(r.data.native,16)/1e18).toFixed(5) : '0';
-      const tokens = r.data.tokens?.map(t=>`<div class="text-xs">${t.token}: ${t.balance}</div>`).join('') || '<div class="text-xs text-zinc-600">sem tokens mapeados</div>';
-      return `<div class="bg-zinc-900 border border-green-900/50 rounded-xl p-4">
-        <div class="flex justify-between"><span class="font-bold text-green-400">${r.c.name}</span><span class="text- bg-green-600 px-2 py-1 rounded-full">CARTEIRA</span></div>
-        <div class="mt-2 text-sm">Saldo: <b>${eth} ${r.c.native}</b></div>
-        <div class="mt-1">${tokens}</div>
-      </div>`;
-    }
-    return `<div class="bg-zinc-900/20 border border-zinc-800 border-dashed p-4 rounded-xl opacity-40"><div class="text-xs text-zinc-600">${r.c.name} • vazio</div></div>`;
+  out.innerHTML = `<div class="mb-3 text-green-400 font-bold">✅ Carteira encontrada em ${comSaldo.length} blockchain(s):</div>` + 
+  comSaldo.map(c=>{
+    const eth = (Number(BigInt(c.hex))/1e18).toFixed(6);
+    return `<div class="bg-zinc-900 border border-green-900/50 p-4 rounded-xl mb-2 flex justify-between items-center">
+      <div><div class="font-bold">${NAMES[c.chain]} - ${c.chain}</div><div class="text-xs text-zinc-500">Saldo: ${eth} ${c.chain=='56'?'BNB':c.chain=='137'?'MATIC':c.chain=='43114'?'AVAX':'ETH'}</div></div>
+      <div class="text- bg-green-600 px-3 py-1 rounded-full">TEM SALDO</div>
+    </div>`;
   }).join('');
-
-  const found = results.filter(r=>r.type!=='empty' && r.type!=='error').length;
-  status.textContent = `✅ Encontrado em ${found} de 8 chains`;
-  btn.disabled = false;
 }
 </script>
 </body>
