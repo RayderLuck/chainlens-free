@@ -8,7 +8,7 @@ export async function onRequestPost(c){
   const {request,env}=c;
   const body=await request.json();
   const chain=new URL(request.url).searchParams.get('chain')||'56';
-  const key=env.NODEREAL_KEY;
+  const nodeRealKey = env.VITE_NODEREAL_KEY || env.NODEREAL_KEY || env.ETHERSCAN_V2_KEY;
   const url=`https://${NODE_MAP[chain]}.nodereal.io/v1/${key}`;
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const t=await r.text();
